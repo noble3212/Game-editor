@@ -11,6 +11,8 @@
     canvas { border: 1px solid #444; image-rendering: pixelated; }
     textarea { width: 100%; height: 200px; background: #000; color: #0f0; font-family: monospace; }
     iframe { width: 100%; height: 300px; background: #fff; border: 1px solid #444; margin-top: 10px; }
+    #fileTabs button { display: inline-block; width: auto; margin-right: 5px; padding: 5px 10px; background: #2a2a2a; color: #eee; border: none; cursor: pointer; }
+    #fileTabs button.active { font-weight: bold; background: #444; }
   </style>
 </head>
 <body>
@@ -18,7 +20,7 @@
     <h3>Tools</h3>
     <button onclick="show('jsonEditor')">JSON Editor</button>
     <button onclick="show('texturePainter')">Texture Painter</button>
-    <button onclick="show('jsRunner')">JS/html Sandbox</button>
+    <button onclick="show('jsRunner')">JS Sandbox</button>
   </div>
   <div id="main">
     <!-- JSON Editor -->
@@ -46,14 +48,13 @@
       <button onclick="downloadTexture()">Export PNG</button>
     </div>
 
-    <!-- JS Runner -->
+    <!-- JS Runner (Multi-File) -->
     <div id="jsRunner" style="display:none;">
-      <h2>Live JS/HTML Sandbox</h2>
-      <textarea id="codeArea"><!--html-->
-<h1>Hello HTML</h1>
-<p>This is live preview.</p></textarea>
-      <button onclick="runCode()">Run</button>
-      <pre id="output"></pre>
+      <h2>Live Multi-File JS/HTML/CSS Sandbox</h2>
+      <div id="fileTabs"></div>
+      <button onclick="addFile()">+ Add File</button>
+      <textarea id="codeArea"></textarea>
+      <button onclick="runProject()">Run</button>
       <iframe id="htmlPreview" sandbox="allow-scripts"></iframe>
     </div>
   </div>
@@ -116,36 +117,67 @@
       link.click();
     }
 
-    // JS/HTML Runner
-    function runCode() {
-      const code = document.getElementById('codeArea').value;
-      const output = document.getElementById('output');
-      const iframe = document.getElementById('htmlPreview');
-      output.textContent = '';
-      iframe.style.display = 'none';
+    // Multi-File JS/HTML/CSS Runner
+    const files = {
+      'index.html': '<!--html-->\n<h1>Hello HTML</h1>\n<p>This is live preview.</p>',
+      'style.css': 'body { background: #fafafa; color: #333; }',
+      'script.js': 'console.log("JS Running...")'
+    };
+    let currentFile = 'index.html';
 
-      if (code.trim().startsWith('<!--html-->')) {
-        iframe.style.display = 'block';
-        iframe.srcdoc = code.replace('<!--html-->', '').trim();
-      } else {
-        const originalLog = console.log;
-        try {
-          let logBuffer = '';
-          console.log = (...args) => {
-            logBuffer += args.join(' ') + '\n';
-          };
-          const result = Function(code)();
-          if (result !== undefined) logBuffer += result + '\n';
-          output.textContent = logBuffer || '✓ Code ran successfully.';
-        } catch (err) {
-          output.textContent = 'Error: ' + err.message;
-        } finally {
-          console.log = originalLog;
-        }
+    function renderTabs() {
+      const tabBar = document.getElementById('fileTabs');
+      tabBar.innerHTML = '';
+      for (let fileName in files) {
+        const btn = document.createElement('button');
+        btn.textContent = fileName;
+        btn.className = fileName === currentFile ? 'active' : '';
+        btn.onclick = () => switchFile(fileName);
+        tabBar.appendChild(btn);
       }
     }
 
+    function switchFile(fileName) {
+      files[currentFile] = document.getElementById('codeArea').value;
+      currentFile = fileName;
+      document.getElementById('codeArea').value = files[fileName];
+      renderTabs();
+    }
+
+    function addFile() {
+      const name = prompt('Enter file name (e.g. new.html, style2.css, app.js):');
+      if (!name || files[name]) return;
+      files[name] = '';
+      switchFile(name);
+    }
+
+    function runProject() {
+      files[currentFile] = document.getElementById('codeArea').value;
+      let html = files['index.html'] || '';
+      let css = '', js = '';
+      for (let name in files) {
+        if (name.endsWith('.css')) css += '\n' + files[name];
+        if (name.endsWith('.js')) js += '\n' + files[name];
+      }
+      const output = `
+<!DOCTYPE html>
+<html>
+<head>
+<style>${css}</style>
+</head>
+<body>
+${html.replace('<!--html-->', '').trim()}
+<script>${js}<\/script>
+</body>
+</html>
+      `.trim();
+      const iframe = document.getElementById('htmlPreview');
+      iframe.srcdoc = output;
+    }
+
     initPainter();
+    renderTabs();
+    document.getElementById('codeArea').value = files[currentFile];
     show('jsonEditor');
   </script>
 </body>
