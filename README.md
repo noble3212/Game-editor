@@ -1,1 +1,1 @@
-website: https://github.com/noble3212/Game-editor/deployments/github-pages
+website: (https://noble3212.github.io/Game-editor/)
