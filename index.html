@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tiny Game Tools + Demo</title>
+  <style>
+    body { background: #121212; color: #eee; font-family: monospace; margin: 0; padding: 0; display: flex; height: 100vh; }
+    #sidebar { width: 200px; background: #1f1f1f; padding: 10px; box-shadow: 2px 0 5px #000; }
+    #main { flex: 1; padding: 10px; overflow: auto; }
+    button, select, input[type=number] { margin: 5px 0; display: block; width: 100%; }
+    canvas { border: 1px solid #444; image-rendering: pixelated; }
+    textarea { width: 100%; height: 200px; background: #000; color: #0f0; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h3>Tools</h3>
+    <button onclick="show('jsonEditor')">JSON Editor</button>
+    <button onclick="show('texturePainter')">Texture Painter</button>
+    <button onclick="show('jsRunner')">JS Sandbox</button>
+    <button onclick="show('gameDemo')">Play Game</button>
+  </div>
+  <div id="main">
+    <!-- JSON Editor -->
+    <div id="jsonEditor" style="display:none;">
+      <h2>Game Tuning JSON Editor</h2>
+      <textarea id="jsonInput">{
+  "playerSpeed": 5,
+  "jumpHeight": 10,
+  "health": 100
+}</textarea>
+      <button onclick="loadJson()">Load JSON</button>
+      <div id="jsonFields"></div>
+      <button onclick="saveJson()">Save JSON</button>
+    </div>
+
+    <!-- Texture Painter -->
+    <div id="texturePainter" style="display:none;">
+      <h2>Block Texture Painter</h2>
+      <label>Size: <select id="texSize" onchange="initPainter()">
+        <option value="16">16x16</option>
+        <option value="32">32x32</option>
+      </select></label>
+      <canvas id="paintCanvas" width="256" height="256"></canvas>
+      <input type="color" id="colorPicker" value="#ff0000">
+      <button onclick="downloadTexture()">Export PNG</button>
+    </div>
+
+    <!-- JS Runner -->
+    <div id="jsRunner" style="display:none;">
+      <h2>Live JS Sandbox</h2>
+      <textarea id="codeArea">console.log('Hello from sandbox');</textarea>
+      <button onclick="runCode()">Run</button>
+      <pre id="output"></pre>
+    </div>
+
+    <!-- Game Demo -->
+    <div id="gameDemo" style="display:none;">
+      <h2>Mini Game</h2>
+      <canvas id="gameCanvas" width="512" height="256"></canvas>
+      <p>Use Arrow Keys to Move, Space to Jump</p>
+    </div>
+  </div>
+
+  <script>
+    function show(id) {
+      ['jsonEditor', 'texturePainter', 'jsRunner', 'gameDemo'].forEach(e => {
+        document.getElementById(e).style.display = 'none';
+      });
+      document.getElementById(id).style.display = 'block';
+    }
+
+    // JSON Tool
+    function loadJson() {
+      const json = JSON.parse(document.getElementById('jsonInput').value);
+      const container = document.getElementById('jsonFields');
+      container.innerHTML = '';
+      for (let key in json) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = json[key];
+        input.dataset.key = key;
+        container.append(`${key}: `, input, document.createElement('br'));
+      }
+    }
+
+    function saveJson() {
+      const inputs = document.querySelectorAll('#jsonFields input');
+      const json = {};
+      inputs.forEach(input => {
+        json[input.dataset.key] = parseFloat(input.value);
+      });
+      document.getElementById('jsonInput').value = JSON.stringify(json, null, 2);
+    }
+
+    // Texture Painter
+    let ctx, size;
+    function initPainter() {
+      size = parseInt(document.getElementById('texSize').value);
+      const canvas = document.getElementById('paintCanvas');
+      canvas.width = canvas.height = size * 16;
+      ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    document.getElementById('paintCanvas').addEventListener('click', e => {
+      const rect = e.target.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / 16);
+      const y = Math.floor((e.clientY - rect.top) / 16);
+      ctx.fillStyle = document.getElementById('colorPicker').value;
+      ctx.fillRect(x * 16, y * 16, 16, 16);
+    });
+
+    function downloadTexture() {
+      const link = document.createElement('a');
+      link.download = 'texture.png';
+      link.href = document.getElementById('paintCanvas').toDataURL();
+      link.click();
+    }
+
+    // JS Runner
+    function runCode() {
+      const code = document.getElementById('codeArea').value;
+      const output = document.getElementById('output');
+      try {
+        const result = Function(code)();
+        output.textContent = result ?? '✓ Code ran successfully.';
+      } catch (err) {
+        output.textContent = 'Error: ' + err.message;
+      }
+    }
+
+    // Game Demo
+    const gameCanvas = document.getElementById('gameCanvas');
+    const gctx = gameCanvas.getContext('2d');
+    let player = { x: 50, y: 200, vx: 0, vy: 0, grounded: true };
+    let keys = {};
+    let gravity = 0.5, friction = 0.9;
+
+    function gameLoop() {
+      const settings = JSON.parse(document.getElementById('jsonInput').value);
+      gctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+      // Movement
+      if (keys['ArrowLeft']) player.vx -= 0.5;
+      if (keys['ArrowRight']) player.vx += 0.5;
+      if (keys[' '] && player.grounded) {
+        player.vy = -settings.jumpHeight;
+        player.grounded = false;
+      }
+
+      player.vy += gravity;
+      player.x += player.vx * (settings.playerSpeed / 5);
+      player.y += player.vy;
+      player.vx *= friction;
+
+      // Ground collision
+      if (player.y >= 200) {
+        player.y = 200;
+        player.vy = 0;
+        player.grounded = true;
+      }
+
+      // Draw player
+      gctx.fillStyle = 'lime';
+      gctx.fillRect(player.x, player.y, 20, 20);
+
+      // Ground
+      gctx.fillStyle = '#888';
+      gctx.fillRect(0, 220, gameCanvas.width, 40);
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener('keydown', e => keys[e.key] = true);
+    window.addEventListener('keyup', e => keys[e.key] = false);
+
+    gameLoop();
+    initPainter();
+    show('jsonEditor');
+  </script>
+</body>
+</html>
