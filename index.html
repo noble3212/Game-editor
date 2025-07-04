@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Tiny Game Tools + Demo</title>
+  <title>Tiny Game Tools</title>
   <style>
     body { background: #121212; color: #eee; font-family: monospace; margin: 0; padding: 0; display: flex; height: 100vh; }
     #sidebar { width: 200px; background: #1f1f1f; padding: 10px; box-shadow: 2px 0 5px #000; }
@@ -10,6 +10,7 @@
     button, select, input[type=number] { margin: 5px 0; display: block; width: 100%; }
     canvas { border: 1px solid #444; image-rendering: pixelated; }
     textarea { width: 100%; height: 200px; background: #000; color: #0f0; font-family: monospace; }
+    iframe { width: 100%; height: 300px; background: #fff; border: 1px solid #444; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -18,7 +19,6 @@
     <button onclick="show('jsonEditor')">JSON Editor</button>
     <button onclick="show('texturePainter')">Texture Painter</button>
     <button onclick="show('jsRunner')">JS Sandbox</button>
-    <button onclick="show('gameDemo')">Play Game</button>
   </div>
   <div id="main">
     <!-- JSON Editor -->
@@ -48,23 +48,19 @@
 
     <!-- JS Runner -->
     <div id="jsRunner" style="display:none;">
-      <h2>Live JS Sandbox</h2>
-      <textarea id="codeArea">console.log('Hello from sandbox');</textarea>
+      <h2>Live JS/HTML Sandbox</h2>
+      <textarea id="codeArea"><!--html-->
+<h1>Hello HTML</h1>
+<p>This is live preview.</p></textarea>
       <button onclick="runCode()">Run</button>
       <pre id="output"></pre>
-    </div>
-
-    <!-- Game Demo -->
-    <div id="gameDemo" style="display:none;">
-      <h2>Mini Game</h2>
-      <canvas id="gameCanvas" width="512" height="256"></canvas>
-      <p>Use Arrow Keys to Move, Space to Jump</p>
+      <iframe id="htmlPreview" sandbox="allow-scripts"></iframe>
     </div>
   </div>
 
   <script>
     function show(id) {
-      ['jsonEditor', 'texturePainter', 'jsRunner', 'gameDemo'].forEach(e => {
+      ['jsonEditor', 'texturePainter', 'jsRunner'].forEach(e => {
         document.getElementById(e).style.display = 'none';
       });
       document.getElementById(id).style.display = 'block';
@@ -120,64 +116,35 @@
       link.click();
     }
 
-    // JS Runner
+    // JS/HTML Runner
     function runCode() {
       const code = document.getElementById('codeArea').value;
       const output = document.getElementById('output');
-      try {
-        const result = Function(code)();
-        output.textContent = result ?? '✓ Code ran successfully.';
-      } catch (err) {
-        output.textContent = 'Error: ' + err.message;
+      const iframe = document.getElementById('htmlPreview');
+      output.textContent = '';
+      iframe.style.display = 'none';
+
+      if (code.trim().startsWith('<!--html-->')) {
+        iframe.style.display = 'block';
+        iframe.srcdoc = code.replace('<!--html-->', '').trim();
+      } else {
+        const originalLog = console.log;
+        try {
+          let logBuffer = '';
+          console.log = (...args) => {
+            logBuffer += args.join(' ') + '\n';
+          };
+          const result = Function(code)();
+          if (result !== undefined) logBuffer += result + '\n';
+          output.textContent = logBuffer || '✓ Code ran successfully.';
+        } catch (err) {
+          output.textContent = 'Error: ' + err.message;
+        } finally {
+          console.log = originalLog;
+        }
       }
     }
 
-    // Game Demo
-    const gameCanvas = document.getElementById('gameCanvas');
-    const gctx = gameCanvas.getContext('2d');
-    let player = { x: 50, y: 200, vx: 0, vy: 0, grounded: true };
-    let keys = {};
-    let gravity = 0.5, friction = 0.9;
-
-    function gameLoop() {
-      const settings = JSON.parse(document.getElementById('jsonInput').value);
-      gctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-
-      // Movement
-      if (keys['ArrowLeft']) player.vx -= 0.5;
-      if (keys['ArrowRight']) player.vx += 0.5;
-      if (keys[' '] && player.grounded) {
-        player.vy = -settings.jumpHeight;
-        player.grounded = false;
-      }
-
-      player.vy += gravity;
-      player.x += player.vx * (settings.playerSpeed / 5);
-      player.y += player.vy;
-      player.vx *= friction;
-
-      // Ground collision
-      if (player.y >= 200) {
-        player.y = 200;
-        player.vy = 0;
-        player.grounded = true;
-      }
-
-      // Draw player
-      gctx.fillStyle = 'lime';
-      gctx.fillRect(player.x, player.y, 20, 20);
-
-      // Ground
-      gctx.fillStyle = '#888';
-      gctx.fillRect(0, 220, gameCanvas.width, 40);
-
-      requestAnimationFrame(gameLoop);
-    }
-
-    window.addEventListener('keydown', e => keys[e.key] = true);
-    window.addEventListener('keyup', e => keys[e.key] = false);
-
-    gameLoop();
     initPainter();
     show('jsonEditor');
   </script>
