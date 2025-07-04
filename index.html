@@ -14,6 +14,7 @@
     #fileTabs button { display: inline-block; width: auto; margin-right: 5px; padding: 5px 10px; background: #2a2a2a; color: #eee; border: none; cursor: pointer; }
     #fileTabs button.active { font-weight: bold; background: #444; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
   <div id="sidebar">
@@ -55,6 +56,7 @@
       <button onclick="addFile()">+ Add File</button>
       <textarea id="codeArea"></textarea>
       <button onclick="runProject()">Run</button>
+      <button onclick="downloadAllFiles()">Download Project</button>
       <iframe id="htmlPreview" sandbox="allow-scripts"></iframe>
     </div>
   </div>
@@ -175,6 +177,22 @@ ${html.replace('<!--html-->', '').trim()}
       iframe.srcdoc = output;
     }
 
+    function downloadAllFiles() {
+      files[currentFile] = document.getElementById('codeArea').value;
+
+      const zip = new JSZip();
+      for (let name in files) {
+        zip.file(name, files[name]);
+      }
+
+      zip.generateAsync({ type: "blob" }).then(content => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(content);
+        a.download = "tiny-game-project.zip";
+        a.click();
+      });
+    }
+
     initPainter();
     renderTabs();
     document.getElementById('codeArea').value = files[currentFile];
@@ -182,3 +200,4 @@ ${html.replace('<!--html-->', '').trim()}
   </script>
 </body>
 </html>
+
